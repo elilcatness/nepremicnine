@@ -22,9 +22,9 @@ def get_doc(url: str, **kwargs):
     return html.fromstring(response.text)
 
 
-def _load_ads_from_db() -> list[str]:
+def _load_ads_from_db(user_id: int) -> list[str]:
     with db_session.create_session() as session:
-        mail = session.query(Mail).first()
+        mail = session.query(Mail).get(user_id)
         if not mail or not mail.ads:
             return []
         return mail.ads.split(';')
@@ -54,7 +54,7 @@ def parse_page(url: str, **kwargs):
     return {'url': url, 'Title': title, 'Description': description, 'Price': price, 'img': img}
 
 
-def get_last_ads(url: str, count: int = 5) -> tuple:
+def get_last_ads(url: str, user_id: int, count: int = 5) -> tuple:
     domain = '//'.join(url.split('/')[:3:2])
     doc = get_doc(url, headers=HEADERS)
     error_msg = f'Failed to get last_ads in {url}'
@@ -63,7 +63,7 @@ def get_last_ads(url: str, count: int = 5) -> tuple:
     ads = doc.xpath('//a[@class="slika"]')
     if not ads:
         return print(error_msg), None
-    last_req_ads = _load_ads_from_db()
+    last_req_ads = _load_ads_from_db(user_id)
     last_ads = []
     new_ads = []
     for ad in ads[:count] if count < len(ads) else ads:
@@ -82,7 +82,7 @@ def process(context: CallbackContext):
     user_id = context.job.context.user_data['id']
     with db_session.create_session() as session:
         mail = session.query(Mail).get(user_id)
-        new_ads, last_ads = get_last_ads(os.getenv('url'))
+        new_ads, last_ads = get_last_ads(user_id, os.getenv('url'))
         if not new_ads:
             return
         if last_ads:
